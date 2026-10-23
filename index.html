@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Montador de Busca</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: uma coluna; grupos de termos clicáveis em cima, consulta montada fixa embaixo */
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --fg:#1b2230; --muted:#5d6678; --line:#dfe3ea;
+  --accent:#2f5bd3; --accent-fg:#ffffff; --chip:#e8eefc; --chip-fg:#1f3f99;
+  --neg:#fbe9e7; --neg-fg:#9a2a1c; --neg-line:#e3a397; --code:#eef1f6;
+  --display:"Fraunces",Georgia,serif; --body:"Instrument Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12151c; --surface:#1a1f29; --fg:#e7eaf0; --muted:#9aa3b5; --line:#2c3341;
+  --accent:#7d9cff; --accent-fg:#0d1220; --chip:#24304d; --chip-fg:#c6d4ff;
+  --neg:#3a2220; --neg-fg:#ffb4a8; --neg-line:#7a3a30; --code:#202634; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12151c; --surface:#1a1f29; --fg:#e7eaf0; --muted:#9aa3b5; --line:#2c3341;
+  --accent:#7d9cff; --accent-fg:#0d1220; --chip:#24304d; --chip-fg:#c6d4ff;
+  --neg:#3a2220; --neg-fg:#ffb4a8; --neg-line:#7a3a30; --code:#202634; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:720px;margin:0 auto;padding-block:40px 24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:22px}
+h1{font-family:var(--display);font-weight:600;font-size:2rem;line-height:1.15;margin:0;text-wrap:balance}
+.lead{color:var(--muted);margin:6px 0 0;max-width:62ch}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.85rem;color:var(--muted);margin-top:10px;align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:12px;height:12px;border-radius:3px;border:1px solid var(--line);background:var(--surface)}
+.dot.on{background:var(--accent);border-color:var(--accent)}
+.dot.neg{background:var(--neg);border-color:var(--neg-line)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:20px}
+.group{display:flex;flex-direction:column;gap:8px}
+.ghead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.label{font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.hint{font-size:.78rem;color:var(--muted)}
+.terms{display:flex;flex-wrap:wrap;gap:6px}
+.t{font:inherit;font-size:.92rem;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:5px 13px;cursor:pointer;transition:background .12s,border-color .12s}
+.t:hover{border-color:var(--accent)}
+.t[data-s="1"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.t[data-s="2"]{background:var(--neg);border-color:var(--neg-line);color:var(--neg-fg);text-decoration:line-through}
+.t:focus-visible,input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:8px}
+input[type=text]{flex:1;min-width:0;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 11px}
+select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.add{font:inherit;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:6px;padding:0 14px;font-weight:500;cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}}
+.dock{position:sticky;bottom:0;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-top:1px solid var(--line);margin-top:8px;padding-bottom:env(safe-area-inset-bottom,0px)}
+.dock-in{max-width:720px;margin:0 auto;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:10px}
+.query{font-family:var(--mono);font-size:.88rem;background:var(--code);border-radius:8px;padding:11px 13px;white-space:pre-wrap;word-break:break-word;max-height:7.5em;overflow:auto}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.go{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:var(--accent-fg);text-decoration:none;font-weight:600;border-radius:8px;padding:10px 18px}
+.go[aria-disabled=true]{opacity:.45;pointer-events:none}
+.ghost{font:inherit;border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:8px;padding:9px 14px;cursor:pointer}
+.status{font-size:.82rem;color:var(--muted)}
+</style>
+<style>*{box-sizing:border-box}body{margin:0}</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Monte sua busca no Google</h1>
+    <p class="lead">Clique nos termos para montar a pesquisa. Termos do mesmo grupo entram como alternativas (um OU outro); grupos diferentes se somam.</p>
+    <div class="legend">
+      <span><i class="dot"></i>1º clique: incluir</span>
+      <span><i class="dot on"></i>incluído</span>
+      <span><i class="dot neg"></i>2º clique: excluir</span>
+      <span>3º clique: desmarcar</span>
+    </div>
+  </header>
+
+  <section class="panel" id="groups" aria-label="Termos"></section>
+
+  <section class="panel" aria-label="Opções">
+    <div class="group">
+      <label class="label" for="extra">Outro termo</label>
+      <form class="row" id="fExtra"><input type="text" id="extra" placeholder="Digite e adicione ao grupo Meus termos" autocomplete="off"><button class="add" type="submit">Adicionar</button></form>
+    </div>
+    <div class="grid2">
+      <div class="group">
+        <label class="label" for="site">Só neste site (opcional)</label>
+        <input type="text" id="site" placeholder="ex.: linkedin.com">
+      </div>
+      <div class="group">
+        <label class="label" for="when">Período</label>
+        <select id="when">
+          <option value="">Qualquer data</option>
+          <option value="d">Últimas 24 horas</option>
+          <option value="w">Última semana</option>
+          <option value="m">Último mês</option>
+          <option value="y">Último ano</option>
+        </select>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="dock">
+  <div class="dock-in">
+    <div class="query" id="query" aria-live="polite"></div>
+    <div class="actions">
+      <a class="go" id="go" href="#" target="_blank" rel="noopener">Buscar no Google ↗</a>
+      <button class="ghost" id="copy" type="button">Copiar</button>
+      <button class="ghost" id="clear" type="button">Desmarcar tudo</button>
+      <span class="status" id="status"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== EDITE AQUI: grupos e termos que aparecem na página ===== */
+const GRUPOS = [
+  { nome: "Pessoa",  termos: ["Flávio Bolsonaro"] },
+  { nome: "Assunto", termos: ["dinheiro vivo", "mansão", "fascismo", "corrupção", "rachadinha"] },
+];
+/* ============================================================== */
+
+GRUPOS.push({nome:"Meus termos", termos:[]});
+const st = {}; // "grupo|termo" -> 0 neutro, 1 incluir, 2 excluir
+const $ = id => document.getElementById(id);
+const fmt = t => /\s/.test(t) ? `"${t.replace(/"/g,"")}"` : t;
+
+function drawGroups(){
+  const box = $("groups"); box.innerHTML = "";
+  GRUPOS.forEach(g => {
+    if (g.nome === "Meus termos" && !g.termos.length) return;
+    const sec = document.createElement("div"); sec.className = "group";
+    sec.innerHTML = `<div class="ghead"><span class="label"></span><span class="hint"></span></div><div class="terms"></div>`;
+    sec.querySelector(".label").textContent = g.nome;
+    const wrap = sec.querySelector(".terms");
+    g.termos.forEach(t => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "t"; b.textContent = t;
+      const k = g.nome + "|" + t; b.dataset.s = st[k] || 0;
+      b.onclick = () => { st[k] = ((st[k] || 0) + 1) % 3; b.dataset.s = st[k]; update(); };
+      wrap.appendChild(b);
+    });
+    box.appendChild(sec);
+  });
+}
+
+function buildQuery(){
+  const parts = [], neg = [];
+  GRUPOS.forEach(g => {
+    const inc = g.termos.filter(t => st[g.nome+"|"+t] === 1).map(fmt);
+    g.termos.filter(t => st[g.nome+"|"+t] === 2).forEach(t => neg.push("-" + fmt(t)));
+    if (inc.length === 1) parts.push(inc[0]);
+    else if (inc.length > 1) parts.push("(" + inc.join(" OR ") + ")");
+  });
+  const site = $("site").value.trim().replace(/^https?:\/\//,"").replace(/\/.*$/,"");
+  return { q: [...parts, ...neg, site ? "site:" + site : ""].filter(Boolean).join(" "), any: parts.length > 0 };
+}
+
+function update(){
+  const { q, any } = buildQuery();
+  $("query").textContent = q || "Clique em pelo menos um termo para incluir.";
+  const go = $("go");
+  if (any) {
+    const p = new URLSearchParams({ q });
+    if ($("when").value) p.set("tbs", "qdr:" + $("when").value);
+    go.href = "https://www.google.com/search?" + p; go.setAttribute("aria-disabled", "false");
+  } else { go.href = "#"; go.setAttribute("aria-disabled", "true"); }
+  $("status").textContent = "";
+}
+
+$("fExtra").addEventListener("submit", e => {
+  e.preventDefault();
+  const meus = GRUPOS[GRUPOS.length - 1];
+  $("extra").value.split(",").map(s => s.trim()).filter(Boolean).forEach(t => {
+    if (!meus.termos.includes(t)) meus.termos.push(t);
+    st["Meus termos|" + t] = 1;
+  });
+  $("extra").value = ""; drawGroups(); update();
+});
+["site","when"].forEach(id => $(id).addEventListener("input", update));
+$("copy").onclick = async () => {
+  const { q } = buildQuery(); if (!q) return;
+  try { await navigator.clipboard.writeText(q); $("status").textContent = "Copiado."; }
+  catch (e) { const r = document.createRange(); r.selectNodeContents($("query")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("status").textContent = "Selecionado. Use Ctrl+C."; }
+};
+$("clear").onclick = () => { for (const k in st) st[k] = 0; drawGroups(); update(); };
+
+// exemplo inicial já marcado
+st["Pessoa|Flávio Bolsonaro"] = 1;
+drawGroups(); update();
+</script>
+</body>
+</html>
